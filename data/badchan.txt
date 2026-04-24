@@ -1,0 +1,2 @@
+# SBND bad channels — format: <channel_int> # <description>
+# Populate with SBND-specific channel IDs.
