@@ -17,6 +17,7 @@ Y axis = tick number (0–3399 for 3400-tick readouts).
 |---|---|---|
 | `hu_orig{N}`, `hv_orig{N}`, `hw_orig{N}` | `TH2I` | Raw ADC (before any noise filter); U, V, W planes of TPC N |
 | `hu_raw{N}`, `hv_raw{N}`, `hw_raw{N}` | `TH2I` | Denoised waveform (after noise filter, before deconvolution) |
+| `hu_dnnsp{N}`, `hv_dnnsp{N}`, `hw_dnnsp{N}` | `TH2F` | DNN signal processing output — **used by SBND WCT jobs** instead of `gauss`/`wiener` |
 | `hu_gauss{N}`, `hv_gauss{N}`, `hw_gauss{N}` | `TH2F` | Deconvoluted + Gaussian-smeared charge (WCT charge measurement output) |
 | `hu_wiener{N}`, `hv_wiener{N}`, `hw_wiener{N}` | `TH2F` | Deconvoluted + Wiener-filtered (WCT ROI/hit finding output) |
 | `hu_decon{N}`, `hv_decon{N}`, `hw_decon{N}` | `TH2F` | Deconvoluted (Wire-Cell prototype `decon` tag) |
@@ -37,16 +38,17 @@ The plane letters encode the readout plane:
 
 ### Which tags are required by `preprocess.sh`
 
-`preprocess.sh` calls `preprocess.C` four times, looking for these input tags:
+`preprocess.sh` calls `preprocess.C` five times, looking for these input tags:
 
 | Input tag (intag) | Output tag (outtag) | Notes |
 |---|---|---|
-| `orig` | `orig` | Required. Raw ADC. Baseline NOT subtracted here (set_baseline=false). |
-| `raw` | `raw` | Required. Denoised. Baseline IS subtracted during merging (set_baseline=true). |
-| `gauss` | `decon` | Required for the default viewer (`frame=decon`). WCT gauss output is renamed to `decon`. |
+| `orig` | `orig` | Raw ADC. Baseline NOT subtracted here (set_baseline=false). |
+| `raw` | `raw` | Denoised. Baseline IS subtracted during merging (set_baseline=true). |
+| `gauss` | `decon` | Traditional WCT gauss output renamed to `decon`. Skipped if `hu_gauss*` absent. |
+| `dnnsp` | `decon` | **SBND variant**: DNN signal processing output renamed to `decon`. Skipped if `hu_dnnsp*` absent. Only one of `gauss` or `dnnsp` will match a given file. |
 | `threshold` | `threshold` | Required for threshold overlay feature. |
 
-The `wiener` tag (also produces deconvoluted signal) and various ROI-stage tags (`troi`, `lroi`, etc.) are commented out in `preprocess.sh` but can be enabled by uncommenting lines 48–51. The `tree:T_hm → T_bad` merge is also commented out (line 46) — see note in Stage B.
+The `wiener` tag (also produces deconvoluted signal) and various ROI-stage tags (`troi`, `lroi`, etc.) are commented out in `preprocess.sh` but can be enabled by uncommenting the relevant lines. The `tree:T_hm → T_bad` merge is also commented out — see note in Stage B.
 
 ---
 
@@ -82,6 +84,8 @@ The deconvoluted frame name is configurable (`decon`, `wiener`, `gauss`, or any 
 ./magnify.sh file.root 500 gauss 4
 ./magnify.sh file.root 30  decon 1
 ```
+
+**Fallback chain**: if the requested frame histogram is not present in the file, `Data.cc` automatically falls back in this order: `{frame}` → `gauss` → `dnnsp`. This means you can open a raw SBND WCT file (which only has `dnnsp`) with any frame argument and still see the DNN waveforms. A console message is printed for each fallback.
 
 ### 1-D Histograms (optional but recommended)
 
@@ -147,10 +151,10 @@ Sticky-code reference lines are drawn at every multiple of 64 ADC below the base
 
 To produce a file that works with the current (unmodified) viewer:
 
-- [ ] Run Wire-Cell noise filter and signal processing, producing per-APA histograms tagged `orig{N}`, `raw{N}`, `gauss{N}` (or `decon{N}`), `threshold{N}`, `baseline{N}` for N = 0 … 5.
+- [ ] Run Wire-Cell noise filter and signal processing, producing per-TPC histograms tagged `orig{N}`, `raw{N}`, `dnnsp{N}` (SBND) or `gauss{N}` (traditional WCT), `threshold{N}` for N = 0 … 1 (SBND has 2 TPCs).
 - [ ] Include `T_bad{N}` trees with branches `chid`, `start_time`, `end_time`.
 - [ ] Optionally include a `Trun` tree with `runNo`, `subRunNo`, `eventNo`.
-- [ ] Run `./preprocess.sh input.root` to merge into a 15360 × 6000 whole-detector file.
-- [ ] Optionally uncomment the `tree:T_hm → T_bad` line in `preprocess.sh` (line 46) to merge bad-channel trees.
-- [ ] Populate `data/badchan.txt` and `data/noisychan.txt` with detector-specific channel numbers.
-- [ ] Launch with `./magnify.sh output-v2.root 500 gauss 4` (for WCT gauss) or `./magnify.sh output-v2.root 30 decon 1` (for prototype decon).
+- [ ] Run `./preprocess.sh input.root` to merge into a 11264 × 3400 whole-detector file. (`dnnsp → decon` and `gauss → decon` are both attempted; only the one matching your file's histograms will produce output.)
+- [ ] Optionally uncomment the `tree:T_hm → T_bad` line in `preprocess.sh` to merge bad-channel trees (confirm SBND tree name first).
+- [ ] Populate `data/badchan.txt` and `data/noisychan.txt` with SBND-specific channel numbers.
+- [ ] Launch with `./magnify.sh output-v2.root 30 decon 1`. The viewer auto-falls-back to `dnnsp` if `decon` histograms are absent.

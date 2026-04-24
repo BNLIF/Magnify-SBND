@@ -54,10 +54,14 @@ Data::Data(const char* filename, double threshold, const char* frame, int rebin)
     for (int iplane = 0; iplane < 3; ++iplane) {
         decon_name[iplane] = Form("h%c_%s", 'u'+iplane, frame) + suf;
         if (!rootFile->Get(decon_name[iplane])) {
-            TString fb = Form("h%c_gauss", 'u'+iplane) + suf;
-            if (rootFile->Get(fb)) {
-                cout << decon_name[iplane] << " not found, falling back to " << fb << endl;
-                decon_name[iplane] = fb;
+            TString fb_gauss = Form("h%c_gauss", 'u'+iplane) + suf;
+            TString fb_dnn   = Form("h%c_dnnsp", 'u'+iplane) + suf;
+            if (rootFile->Get(fb_gauss)) {
+                cout << decon_name[iplane] << " not found, falling back to " << fb_gauss << endl;
+                decon_name[iplane] = fb_gauss;
+            } else if (rootFile->Get(fb_dnn)) {
+                cout << decon_name[iplane] << " not found, falling back to " << fb_dnn << endl;
+                decon_name[iplane] = fb_dnn;
             }
         }
         decon_ref[iplane] = dynamic_cast<TH2*>(rootFile->Get(decon_name[iplane]));
@@ -123,7 +127,7 @@ void Data::load_runinfo()
 }
 
 void Data::load_geometry() {
-    TString suf = (apaNo >= 0) ? Form("%d", apaNo) : "";
+    TString suf = (tpcNo >= 0) ? Form("%d", tpcNo) : "";
     TTree* t = (TTree*)rootFile->Get("T_geo" + suf);
     if (!t) {
         cout << "T_geo" << suf << " not found; wire-length plot disabled" << endl;

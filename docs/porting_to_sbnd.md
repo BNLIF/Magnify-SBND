@@ -10,7 +10,8 @@ SBND geometry used (verify against your WCT magnify ROOT file):
 - Wire pitch 3.0 mm, tick 0.5 µs, drift 1.6 mm/µs
 
 All geometry constants are now centralised in `event/Geometry.h`.
-Naming: `apaNo` → `tpcNo` throughout; Trun branch lookup tries `tpcNo`, `anodeNo`, `apaNo` in order.
+Naming: `apaNo` → `tpcNo` throughout (including `load_geometry()`); Trun branch lookup tries `tpcNo`, `anodeNo`, `apaNo` in order.
+SBND WCT signal processing uses a DNN backend — histograms are tagged `dnnsp` instead of `gauss`/`wiener`. The viewer falls back to `dnnsp` automatically; `preprocess.sh` includes a `dnnsp → decon` merge step alongside the traditional `gauss → decon` step.
 
 ---
 
@@ -139,26 +140,33 @@ Naming: `apaNo` → `tpcNo` throughout; Trun branch lookup tries `tpcNo`, `anode
 
 ---
 
-## 8. Histogram Naming Prefix (hu\_, hv\_, hw\_)
+## 8. Histogram Naming Prefix (hu\_, hv\_, hw\_) and DNN Tag
 
 **What it is**: Every histogram consumed by the viewer and the test tools is named `h{plane}_{tag}` where `{plane}` ∈ {u, v, w}.
+
+**SBND-specific**: SBND WCT jobs use DNN signal processing and write `dnnsp` as the tag instead of the traditional `gauss` or `wiener`. The viewer handles this via a fallback chain in `event/Data.cc`:
+
+```
+requested frame  →  gauss  →  dnnsp
+```
+
+If `hu_decon0` and `hu_gauss0` are absent but `hu_dnnsp0` is present, the viewer loads the DNN histogram for all frame arguments (`decon`, `wiener`, `gauss`). A console message is printed for each fallback.
+
+`preprocess.sh` includes both a `gauss → decon` and a `dnnsp → decon` merge pass. Only the one that finds matching histograms in the input file produces output; both coexist safely.
 
 **All consumers**:
 
 | File | Usage |
 |---|---|
-| `event/Data.cc:40-55` | `load_waveform("hu_raw", …)`, `load_rawwaveform("hu_orig","hu_baseline")`, `load_threshold("hu_threshold")` — explicit strings for raw/orig/baseline/threshold; `Form("h%c_%s", 'u'+iplane, frame)` for the decon frame |
+| `event/Data.cc:50-64` | `Form("h%c_%s", 'u'+iplane, frame)` for the decon frame, with fallback to `gauss` then `dnnsp` |
+| `event/Data.cc:71-73` | `load_waveform("hu_raw", …)` — explicit strings for raw |
+| `event/Data.cc:80-82` | `load_rawwaveform("hu_orig","hu_baseline")` — explicit strings |
+| `event/Data.cc:84-86` | `load_threshold("hu_threshold")` — explicit strings |
 | `event/Waveforms.cc:35-37` | `name.Contains("hu")` / `name.Contains("hv")` — plane detection |
 | `scripts/preprocess.C:163-200` | `Form("hu_%s", outtag)` — creates output histogram names |
 | `scripts/preprocess.C:168-170` | `Merge1DByTag(f1, hu, Form("hu_%s", intag))` — searches input file for histograms containing the tag string |
 | `test_feature/channelscan/channelscan.C:59-69` | `hu_orig`, `hv_orig`, etc. — explicit names |
-| `test_feature/oscope/buttonTest.C` | `hu_orig0`, `hu_raw0`, `hu_wiener0`, etc. — explicit names with APA suffix |
-
-**For VD**: If VD WCT output uses the same `hu_`/`hv_`/`hw_` convention, no changes are needed. If VD uses different prefixes (e.g. `hx_`/`hu_`/`hy_` for X/U/Y planes), you have two options:
-1. **Rename on the WCT-producer side** (simpler) — configure WCT to write `hu_`/`hv_`/`hw_` regardless of actual plane name.
-2. **Generalize the viewer** — replace the hard-coded prefix strings in `Data.cc` with a configurable plane-name array, and update `Waveforms.cc:35-37` accordingly.
-
-Option 1 is recommended for an initial port.
+| `test_feature/oscope/buttonTest.C` | `hu_orig0`, `hu_raw0`, `hu_wiener0`, etc. — explicit names with TPC suffix |
 
 ---
 

@@ -75,8 +75,8 @@ Magnify_SBND/
 
 | File | Purpose |
 |------|---------|
-| `event/Data.{h,cc}` | Opens the preprocessed ROOT file. Loads run info (`Trun` tree), bad channels (`T_bad` tree), 6 `Waveforms` objects (U/V/W × raw/decon), 3 `RawWaveforms` objects (U/V/W raw ADC + baseline), 3 threshold `TH1I` histograms, and the `badchan.txt`/`noisychan.txt` text files. Also loads per-channel wire length from the `T_geo` + APA-suffix TTree (branches `chid/I`, `length/D` in cm) into a `wire_length` map used by the RMS distribution canvas; silently skipped when the tree is absent. Provides `GetPlaneNo(chanNo)` which maps a global channel number to plane index (0=U, 1=V, 2=W) using the HD geometry constants 2560/800/1600. |
-| `event/Waveforms.{h,cc}` | Wraps one `TH2F` plane (either denoised or deconvoluted). On construction it pre-allocates a `TBox` for every (channel, tick) cell with `|content × scale| > threshold` (can be slow for large signals). Draws 5 APA-boundary `TLine` markers. Provides `Draw2D()` (colz box plot), `Draw1D(chanNo)` (1-D wire waveform), `Draw1DTick(tick)` (projection along channel axis), `DrawLines()` (bad-channel overlays). Also contains a private copy of `GetPlaneNo()` that must stay consistent with `Data::GetPlaneNo()`. |
+| `event/Data.{h,cc}` | Opens the ROOT file (preprocessed or raw WCT per-TPC). Loads run info (`Trun` tree — tries branch names `tpcNo`, `anodeNo`, `apaNo` in order), bad channels (`T_bad` tree), 6 `Waveforms` objects (U/V/W × raw/decon), 3 `RawWaveforms` objects (U/V/W raw ADC + baseline), 3 threshold `TH1I` histograms, and the `badchan.txt`/`noisychan.txt` text files. Also loads per-channel wire length from `T_geo{tpcNo}` TTree (branches `chid/I`, `length/D` in cm) into a `wire_length` map; silently skipped when the tree is absent. Deconvoluted histogram lookup uses a fallback chain: requested `frame` → `gauss` → `dnnsp` — so SBND WCT files (which carry only `dnnsp` histograms) work with any frame argument. Provides `GetPlaneNo(chanNo)` using SBND constants 5632/1984/3968. |
+| `event/Waveforms.{h,cc}` | Wraps one `TH2F` plane (either denoised or deconvoluted). On construction it pre-allocates a `TBox` for every (channel, tick) cell with `|content × scale| > threshold` (can be slow for large signals). Draws 1 TPC-boundary `TLine` marker (N_BLOCKS−1 = 1 for SBND). Provides `Draw2D()` (colz box plot), `Draw1D(chanNo)` (1-D wire waveform), `Draw1DTick(tick)` (projection along channel axis), `DrawLines()` (bad-channel overlays). Also contains a private copy of `GetPlaneNo()` that must stay consistent with `Data::GetPlaneNo()`. |
 | `event/RawWaveforms.{h,cc}` | Wraps one `TH2I` raw-ADC plane plus a matching `TH1I` baseline histogram. If no baseline histogram is present in the file, computes it from the mode of a 4096-bin (12-bit ADC) frequency histogram per channel. Provides `Draw1D(chanNo)` which subtracts the per-channel baseline and overlays sticky-code reference lines at every 64 ADC below the baseline. |
 | `event/BadChannels.{h,cc}` | Reads the `T_bad` TTree (branches: `chid`, `start_time`, `end_time`) into three parallel `std::vector<int>` members: `bad_id`, `bad_start`, `bad_end`. These are used by `Waveforms` to draw vertical gray lines over bad-channel time ranges. |
 
@@ -86,7 +86,7 @@ Magnify_SBND/
 |------|---------|
 | `viewer/MainWindow.{h,cc}` | Top-level `TGMainFrame` (1600 × 900). Contains a "File → Exit" menu bar, hosts `ViewWindow` on top and `ControlWindow` (fixed height 100 px) on the bottom. |
 | `viewer/ViewWindow.{h,cc}` | `TRootEmbeddedCanvas` holding a single `TCanvas` divided into a 3 × 3 pad grid (`can->Divide(3,3,…)`). Owns the four available color palettes (Rainbow, Gray, Fire, Summer). |
-| `viewer/ControlWindow.{h,cc}` | `TGHorizontalFrame` with all user-facing widgets: `channelEntry` (0–15359), `timeEntry` (0–6000), `threshEntry[3]` (per-plane threshold sliders), `zAxisRangeEntry[2]`, `timeRangeEntry[2]`, `adcRangeEntry[2]`, `threshScaleEntry`, and buttons `rawWfButton`, `badChanelButton`, `badOnlyButton`, `timeModeButton`, `setThreshButton`, `unZoomButton`. |
+| `viewer/ControlWindow.{h,cc}` | `TGHorizontalFrame` with all user-facing widgets: `channelEntry` (0–11263), `timeEntry` (0–3400), `threshEntry[3]` (per-plane threshold sliders), `zAxisRangeEntry[2]`, `timeRangeEntry[2]`, `adcRangeEntry[2]`, `threshScaleEntry`, and buttons `rawWfButton`, `badChanelButton`, `badOnlyButton`, `timeModeButton`, `setThreshButton`, `unZoomButton`. |
 | `viewer/GuiController.{h,cc}` | Owns `Data`, `MainWindow`, `ViewWindow`, `ControlWindow`. Wires ROOT signal/slot connections in `InitConnections()`. Key handlers: `ThresholdChanged()` (redraw TH2 with new threshold), `SetChannelThreshold()` (use per-channel threshold TH1 × scale factor for decon pads 4–6), `ZRangeChanged()` (update color axis on all 6 TH2 pads), `ChannelChanged()` (draw 1-D denoised + decon + threshold line + optional raw + bad-region boxes in the bottom pad for the selected plane), `TimeChanged()` (draw 1-D tick projection across channels for all 3 decon planes when time-mode is on), `SyncTimeAxis(i)` (propagates Y-axis zoom from any TH2 pad to the other five), `ProcessCanvasEvent()` (translates a canvas click to (channel, tick) and triggers `ChannelChanged` + `TimeChanged`). RMS/FFT panel: `ShowRmsWindow()` (floating control panel), `ComputeRms()` / `LoadRmsFromFile()` (compute or load RMS+FFT cache), `ShowRmsDistribution()` (7-pad canvas: top = RMS histogram, middle = RMS vs channel per plane, bottom = FFT spectra per plane), `ProcessRmsCanvasEvent()` (click in a middle pad populates the bottom FFT pad for that plane and jumps the main waveform). |
 | `viewer/RmsAnalyzer.{h,cc}` | Stateless noise analysis helper. `AnalyzePlane(h)` — percentile-based RMS (WCT CalcRMSWithFlags + SignalFilter algorithm). `AnalyzePlaneWithFft(h, name, outFft)` — same RMS pipeline plus per-channel FFT: signal regions clamped to ±4σ (baseline-subtracted) rather than flagged, then `TVirtualFFT` R2C (one instance reused across channels), magnitude stored into a `TH2F` (channel × frequency in MHz, DC bin zeroed). `Save/Load` overloads write/read RMS TTrees + FFT TH2Fs in a single cache file (`<file>.rms.root`); Load gracefully handles pre-FFT caches by returning null FFT pointers. `AnalyzeFile()` is the batch entry point. |
 
@@ -105,7 +105,7 @@ Magnify_SBND/
 | Directory | Purpose |
 |-----------|---------|
 | `channelscan/` | Standalone tool (`channelscan.sh` / `channelscan.C` / `userdef.h`). Iterates a list of channels (from a text file or the `T_bad` tree), loads the merged `hu/v/w_orig` and `hu/v/w_raw` histograms, calls a user-defined `execute()` function per channel (default: FFT + PNG export). |
-| `evd/` | 2-D image exporter. `preselect.C` carves a (channel, tick) sub-region from the merged histograms; `evd-subregion.py` renders a publication-quality PDF via ROOT + matplotlib. Hard-codes wire pitch (4.71 mm), tick duration (0.5 µs), drift speed (1.6 mm/µs). |
+| `evd/` | 2-D image exporter. `preselect.C` carves a (channel, tick) sub-region from the merged histograms; `evd-subregion.py` renders a publication-quality PDF via ROOT + matplotlib. Hard-codes SBND wire pitch (3.0 mm), tick duration (0.5 µs), drift speed (1.6 mm/µs). |
 | `oscope/` | Alternative single-channel viewer (`buttonTest.C`). Reads per-APA tagged histograms directly (without preprocessing) and overlays multiple processing stages (orig, raw/denoised, wiener, gauss, various ROI stages) for one channel. |
 
 ---
@@ -117,11 +117,12 @@ User
  │
  ├── ./preprocess.sh input.root [outdir] [ext]
  │       │
- │       ├── root preprocess.C(…, "orig",  "orig",      …, false, "recreate")
- │       ├── root preprocess.C(…, "raw",   "raw",       …, true,  "update")
- │       ├── root preprocess.C(…, "gauss", "decon",     …, false, "update")
- │       └── root preprocess.C(…, "threshold","threshold",…,false,"update")
- │               └── writes  <basename>-v2.root  (15360×6000 merged TH2s)
+ │       ├── root preprocess.C(…, "orig",      "orig",      …, false, "recreate")
+ │       ├── root preprocess.C(…, "raw",       "raw",       …, true,  "update")
+ │       ├── root preprocess.C(…, "gauss",     "decon",     …, false, "update")  ← traditional WCT
+ │       ├── root preprocess.C(…, "dnnsp",     "decon",     …, false, "update")  ← SBND DNN
+ │       └── root preprocess.C(…, "threshold", "threshold", …, false, "update")
+ │               └── writes  <basename>-v2.root  (11264×3400 merged TH2s)
  │
  └── ./magnify.sh <basename>-v2.root [threshold] [frame] [rebin]
          │

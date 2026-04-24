@@ -41,7 +41,8 @@ cd $magnify_source/scripts
 
 root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "orig", "orig", "'"$ext"'", false, "recreate")'
 root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "raw", "raw", "'"$ext"'", true)'
-root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "gauss", "decon", "'"$ext"'")'
+root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "gauss",  "decon", "'"$ext"'")'
+root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "dnnsp", "decon", "'"$ext"'")'
 root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "threshold", "threshold", "'"$ext"'")'
 # root -l -b -q preprocess.C+'("'"$rootfile"'", "'"$outPath"'", "tree:T_hm", "T_bad", "'"$ext"'")'
 
