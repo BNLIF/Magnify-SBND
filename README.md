@@ -2,7 +2,8 @@
 
 ## A magnifier to investigate raw and deconvoluted waveforms for the SBND detector.
 
-SBND geometry: 2 TPCs × 5632 channels/TPC = 11 264 total channels, 3400 time ticks, U/V/W planes (1984 + 1984 + 1664 ch/TPC).
+SBND geometry: 2 TPCs × 5638 channels/TPC = 11 276 total channels, 3427 time ticks (3400 physics readout + 27 deconvolution-tail ticks with real signal), U/V/W planes (1984 + 1984 + 1670 ch/TPC).
+See `docs/geometry.md` for the full channel-range and timing reference.
 
 Derived from `Magnify_PDHD` (itself derived from `Magnify_PDVD` and upstream `Magnify-protodune`).
 See `docs/porting_to_sbnd.md` for a record of all changes made from PDHD.
@@ -49,6 +50,22 @@ If one omits the file name, a dialog will open to let user select the file:
 cd scripts/
 root -l loadClasses.C Magnify.C
 ```
+
+### In-GUI event and anode navigation
+
+The second row of the control window contains a **Navigation** group that lets you
+switch events and anodes without restarting the viewer:
+
+| Control | Action |
+|---------|--------|
+| **Anode** combo | Switch between Anode 0 and Anode 1 for the current event |
+| **Event** combo | Jump directly to any event found under `input_data/` (sorted numerically) |
+| **`<`** button | Step to the previous event (clamps at the first) |
+| **`>`** button | Step to the next event (clamps at the last) |
+
+Events are discovered automatically at startup by scanning the `input_data/` directory
+for subdirectories matching `evt*` that contain at least one `magnify-*-anode{0,1}.root`
+file.  No code change is needed when new events are added.
 
 ### RMS & FFT noise analysis (batch)
 
