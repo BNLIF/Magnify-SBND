@@ -7,7 +7,7 @@
 static const int N_BLOCKS       = 2;     // number of TPCs
 static const int N_CH_U         = 1984;  // U wires per TPC
 static const int N_CH_V         = 1984;  // V wires per TPC
-static const int N_CH_W         = 1664;  // Y/W wires per TPC (collection plane)
+static const int N_CH_W         = 1670;  // Y/W wires per TPC (collection plane) — verified against hw_dnnsp{0,1} Xaxis
 static const int N_CH_PER_BLOCK = N_CH_U + N_CH_V + N_CH_W;   // 5632
 static const int N_TOTAL_CH     = N_BLOCKS * N_CH_PER_BLOCK;   // 11264
 static const int N_TICKS        = 3400;

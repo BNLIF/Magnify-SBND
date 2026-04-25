@@ -69,7 +69,10 @@ Waveforms::Waveforms(TH2F *h, BadChannels* v, TString name, TString title, doubl
         }
     }
     for (int i=0; i != N_BLOCKS-1; i++) {
-        line = new TLine(N_CH_PER_BLOCK*(i+1), 0, N_CH_PER_BLOCK*(i+1), N_TICKS);
+        line = new TLine(
+            N_CH_PER_BLOCK*(i+1), hOrig->GetYaxis()->GetBinLowEdge(1),
+            N_CH_PER_BLOCK*(i+1), hOrig->GetYaxis()->GetBinUpEdge(nTDCs)
+        );
         line->SetLineColorAlpha(kBlack, 0.2);
         tpc_lines.push_back(line);
     }

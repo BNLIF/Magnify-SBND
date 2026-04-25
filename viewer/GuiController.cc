@@ -129,6 +129,7 @@ void GuiController::InitConnections()
     cw->timeRangeEntry[1]->SetNumber(data->wfs.at(0)->nTDCs);
 
     cw->channelEntry->Connect("ValueSet(Long_t)", "GuiController", this, "ChannelChanged()");
+    cw->timeEntry->SetLimits(TGNumberFormat::kNELLimitMinMax, 0, data->wfs.at(0)->nTDCs);
     cw->timeEntry->Connect("ValueSet(Long_t)", "GuiController", this, "TimeChanged()");
     cw->badChanelButton->Connect("Clicked()", "GuiController", this, "UpdateShowBadChannel()");
     cw->badChanelButton->SetToolTipText(TString::Format("U: %lu, V: %lu, W: %lu",

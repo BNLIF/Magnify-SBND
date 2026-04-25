@@ -58,7 +58,7 @@ ControlWindow::ControlWindow(const TGWindow *p, int w, int h)
         TGNumberFormat::kNESInteger,
         TGNumberFormat::kNEANonNegative,
         TGNumberFormat::kNELLimitMinMax,
-        0, 3400);
+        0, 100000);  // placeholder; GuiController::InitConnections overrides with actual histogram nbinsY
     group_general->AddFrame(timeEntry, new TGLayoutHints(kLHintsTop | kLHintsLeft,  1, 1, 1, 1));
 
     timeModeButton = new TGCheckButton(group_general, "time mode  ");
