@@ -7,7 +7,7 @@ class TGNumberEntry;
 class TGCheckButton;
 class TGTextButton;
 
-class ControlWindow: public TGHorizontalFrame
+class ControlWindow: public TGVerticalFrame
 {
 public:
     ControlWindow(const TGWindow *p, int w, int h);

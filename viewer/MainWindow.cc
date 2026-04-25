@@ -17,7 +17,7 @@ MainWindow::MainWindow(const TGWindow *p, int w,int h)
     fViewAndControlFrame = new TGVerticalFrame(this, w, h);
     AddFrame(fViewAndControlFrame, new TGLayoutHints(kLHintsExpandX  | kLHintsExpandY, 2, 2, 2, 2));
 
-    int controlWindowHeight = 100;
+    int controlWindowHeight = 160;
     fViewWindow = new ViewWindow(fViewAndControlFrame, w, h-controlWindowHeight);
     fViewAndControlFrame->AddFrame(fViewWindow, new TGLayoutHints(
         kLHintsTop | kLHintsExpandX | kLHintsExpandY , 2, 2, 2, 2));
