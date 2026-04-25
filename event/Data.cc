@@ -314,6 +314,13 @@ void Data::load_threshold(const char* name)
 
 Data::~Data()
 {
+    for (auto* w : wfs)     delete w;
+    wfs.clear();
+    for (auto* r : raw_wfs) delete r;
+    raw_wfs.clear();
+    delete bad_channels;
+    bad_channels = nullptr;
+    thresh_histos.clear();  // owned by rootFile; freed when rootFile closes
     delete rootFile;
 }
 // Local Variables:

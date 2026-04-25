@@ -6,6 +6,8 @@
 #include "TString.h"
 #include "RmsAnalyzer.h"
 
+#include <vector>
+
 class MainWindow;
 class ViewWindow;
 class ControlWindow;
@@ -75,6 +77,13 @@ public:
     void ToggleRmsOverlay();
     void ProcessRmsCanvasEvent(Int_t ev, Int_t x, Int_t y, TObject* selected);
 
+    // Navigation
+    void OnAnodeChanged(Int_t id);
+    void OnEventChanged(Int_t id);
+    void PrevEvent();
+    void NextEvent();
+    void ReloadFile();
+
     TString OpenDialog();
 
     MainWindow *mw;
@@ -98,6 +107,15 @@ private:
     // Trapezoid boundary lines drawn on the decon pads [plane][edge]
     // edge: 0=left(start), 1=right(end), 2=top, 3=bottom
     TLine* regionBoundary[3][4];
+
+    // Navigation state
+    TString              inputDataDir;
+    std::vector<TString> eventTags;
+    int                  curEvtIdx;
+    int                  curAnode;
+    double               initThreshold;
+    TString              initFrame;
+    int                  initRebin;
 
     // RMS analysis state
     TGMainFrame*          rmsWindow;

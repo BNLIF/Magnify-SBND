@@ -6,6 +6,7 @@
 #include "TGListBox.h"
 #include "TGLabel.h"
 #include "TGDoubleSlider.h"
+#include "TGComboBox.h"
 
 #include <iostream>
 using namespace std;
@@ -88,6 +89,25 @@ ControlWindow::ControlWindow(const TGWindow *p, int w, int h)
     group[0]->SetTitle("U Plane");
     group[1]->SetTitle("V Plane");
     group[2]->SetTitle("W Plane");
+
+    TGGroupFrame *group_nav = new TGGroupFrame(row2, "Navigation", kHorizontalFrame);
+    group_nav->SetTitlePos(TGGroupFrame::kLeft);
+    row2->AddFrame(group_nav, new TGLayoutHints(kLHintsTop | kLHintsLeft, 2, 2, 1, 1));
+
+    group_nav->AddFrame(new TGLabel(group_nav, "anode: "), new TGLayoutHints(kLHintsTop | kLHintsCenterY, 2, 1, 2, 2));
+    anodeCombo = new TGComboBox(group_nav, 100);
+    anodeCombo->Resize(80, 22);
+    group_nav->AddFrame(anodeCombo, new TGLayoutHints(kLHintsTop | kLHintsCenterY, 1, 4, 2, 2));
+
+    group_nav->AddFrame(new TGLabel(group_nav, "event: "), new TGLayoutHints(kLHintsTop | kLHintsCenterY, 2, 1, 2, 2));
+    eventCombo = new TGComboBox(group_nav, 101);
+    eventCombo->Resize(90, 22);
+    group_nav->AddFrame(eventCombo, new TGLayoutHints(kLHintsTop | kLHintsCenterY, 1, 4, 2, 2));
+
+    prevEvtButton = new TGTextButton(group_nav, "  <  ");
+    group_nav->AddFrame(prevEvtButton, new TGLayoutHints(kLHintsTop | kLHintsCenterY, 2, 1, 2, 2));
+    nextEvtButton = new TGTextButton(group_nav, "  >  ");
+    group_nav->AddFrame(nextEvtButton, new TGLayoutHints(kLHintsTop | kLHintsCenterY, 1, 2, 2, 2));
 
     TGGroupFrame *group_misc = new TGGroupFrame(row2, "Range", kHorizontalFrame);
     group_misc->SetTitlePos(TGGroupFrame::kLeft);

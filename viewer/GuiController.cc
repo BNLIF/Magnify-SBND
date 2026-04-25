@@ -36,6 +36,9 @@
 #include "TGClient.h"
 #include "TPad.h"
 #include "TH1D.h"
+#include "TGComboBox.h"
+#include "TSystemDirectory.h"
+#include "TSystemFile.h"
 
 #include <iostream>
 #include <vector>
@@ -58,6 +61,62 @@ GuiController::GuiController(const TGWindow *p, int w, int h, const char* fn, do
     else {
         filename = fn;
     }
+    // Save startup args so ReloadFile() can reuse them
+    initThreshold = threshold;
+    initFrame     = frame;
+    initRebin     = rebin;
+
+    // Parse inputDataDir, curEvtIdx, curAnode from the file path.
+    // Expected layout: <inputDataDir>/<evtTag>/magnify-<evtTag>-anode<N>.root
+    TString evtDir  = gSystem->DirName(filename);
+    TString evtTag  = gSystem->BaseName(evtDir);
+    inputDataDir    = gSystem->DirName(evtDir);
+    curAnode        = 0;
+    {
+        TString base = gSystem->BaseName(filename);
+        int apos = base.Index("anode");
+        if (apos != kNPOS && apos + 5 < base.Length())
+            curAnode = base[apos + 5] - '0';
+    }
+
+    // Scan inputDataDir for valid event subdirectories.
+    TSystemDirectory sdir("inputData", inputDataDir.Data());
+    TList* entries = sdir.GetListOfFiles();
+    if (entries) {
+        TIter nxt(entries);
+        TSystemFile* entry;
+        while ((entry = (TSystemFile*)nxt())) {
+            TString name = entry->GetName();
+            if (name == "." || name == "..") continue;
+            if (!entry->IsDirectory()) continue;
+            if (!name.BeginsWith("evt")) continue;
+            TString check = TString::Format("%s/%s/magnify-%s-anode0.root",
+                inputDataDir.Data(), name.Data(), name.Data());
+            TString check1 = TString::Format("%s/%s/magnify-%s-anode1.root",
+                inputDataDir.Data(), name.Data(), name.Data());
+            if (gSystem->AccessPathName(check) && gSystem->AccessPathName(check1)) continue;
+            eventTags.push_back(name);
+        }
+        // Sort by the numeric part after "evt" (e.g. evt9 < evt11 < evt2_sel1)
+        std::sort(eventTags.begin(), eventTags.end(), [](const TString& a, const TString& b){
+            auto num = [](const TString& s) -> int {
+                TString rest = s; rest.Remove(0, 3);
+                return atoi(rest.Data());
+            };
+            return num(a) < num(b);
+        });
+    }
+    // Find current event index
+    curEvtIdx = 0;
+    for (int i = 0; i < (int)eventTags.size(); ++i) {
+        if (eventTags[i] == evtTag) { curEvtIdx = i; break; }
+    }
+    // If not found (unusual path), seed a single-entry list with the current tag
+    if (eventTags.empty()) {
+        eventTags.push_back(evtTag);
+        curEvtIdx = 0;
+    }
+
     data = new Data(filename.Data(), threshold, frame, rebin);
     captureMode = CAPTURE_NONE;
     regionWindow = nullptr;
@@ -142,6 +201,18 @@ void GuiController::InitConnections()
 
     cw->regionSumBtn->Connect("Clicked()", "GuiController", this, "ShowRegionWindow()");
     cw->rmsBtn->Connect("Clicked()", "GuiController", this, "ShowRmsWindow()");
+
+    // Navigation: populate combos and wire buttons
+    cw->anodeCombo->AddEntry("Anode 0", 0);
+    cw->anodeCombo->AddEntry("Anode 1", 1);
+    cw->anodeCombo->Select(curAnode, kFALSE);
+    for (int i = 0; i < (int)eventTags.size(); ++i)
+        cw->eventCombo->AddEntry(eventTags[i].Data(), i);
+    cw->eventCombo->Select(curEvtIdx, kFALSE);
+    cw->anodeCombo->Connect("Selected(Int_t)", "GuiController", this, "OnAnodeChanged(Int_t)");
+    cw->eventCombo->Connect("Selected(Int_t)", "GuiController", this, "OnEventChanged(Int_t)");
+    cw->prevEvtButton->Connect("Clicked()", "GuiController", this, "PrevEvent()");
+    cw->nextEvtButton->Connect("Clicked()", "GuiController", this, "NextEvent()");
 
     // stupid way to connect signal and slots
     vw->can->GetPad(1)->Connect("RangeChanged()", "GuiController", this, "SyncTimeAxis0()");
@@ -1281,6 +1352,103 @@ void GuiController::HandleMenu(int id)
             gApplication->Terminate(0);
             break;
     }
+}
+
+void GuiController::ReloadFile()
+{
+    TString tag  = eventTags[curEvtIdx];
+    TString path = TString::Format("%s/%s/magnify-%s-anode%d.root",
+        inputDataDir.Data(), tag.Data(), tag.Data(), curAnode);
+    if (gSystem->AccessPathName(path)) {
+        cerr << "ReloadFile: file not found: " << path << endl;
+        return;
+    }
+
+    // Hide any sub-windows that hold pointers into old data
+    HideRegionWindow();
+    HideRmsWindow();
+    EraseRegion();
+
+    // Clear all pads (removes primitive refs but does not delete objects)
+    for (int i = 1; i <= 9; ++i) {
+        vw->can->cd(i);
+        gPad->Clear();
+    }
+
+    // Tear down old data; new Data will open the new file
+    delete data;
+    data = new Data(path.Data(), initThreshold, initFrame.Data(), initRebin);
+
+    // Re-seed widget defaults (mirrors InitConnections lines 115-132; no re-Connect)
+    for (int i = 0; i < 3; ++i)
+        cw->threshEntry[i]->SetNumber(data->wfs.at(i)->threshold);
+    cw->zAxisRangeEntry[0]->SetNumber(data->wfs.at(0)->zmin);
+    cw->zAxisRangeEntry[1]->SetNumber(data->wfs.at(0)->zmax);
+    cw->timeRangeEntry[0]->SetNumber(0);
+    cw->timeRangeEntry[1]->SetNumber(data->wfs.at(0)->nTDCs);
+    cw->timeEntry->SetLimits(TGNumberFormat::kNELLimitMinMax, 0, data->wfs.at(0)->nTDCs);
+    cw->badChanelButton->SetState(kButtonUp);
+    cw->badChanelButton->SetToolTipText(TString::Format("U: %lu, V: %lu, W: %lu",
+        data->wfs.at(0)->lines.size(),
+        data->wfs.at(1)->lines.size(),
+        data->wfs.at(2)->lines.size()));
+
+    // Redraw all 9 pads (mirrors ctor block)
+    for (int i = 0; i < 6; ++i) {
+        vw->can->cd(i+1);
+        data->wfs.at(i)->Draw2D();
+    }
+    for (int i = 0; i < 3; ++i) {
+        vw->can->cd(i+7);
+        int chanNo = data->wfs.at(i)->firstChannel;
+        const std::string& comment = data->channel_status[chanNo];
+        data->wfs.at(i)->Draw1D(chanNo, "", comment.c_str());
+        TH1F *h = data->wfs.at(i+3)->Draw1D(chanNo, "same");
+        h->SetLineColor(kRed);
+        hCurrent[i] = h;
+    }
+    vw->can->Modified();
+    vw->can->Update();
+
+    // Sync selector widgets
+    cw->anodeCombo->Select(curAnode, kFALSE);
+    cw->eventCombo->Select(curEvtIdx, kFALSE);
+
+    // Reset analysis state
+    rmsLoaded = false;
+    for (int p = 0; p < 3; ++p) rmsResults[p].clear();
+
+    mw->SetWindowName(TString::Format("Magnify: run %i, sub-run %i, event %i, tpc %i",
+        data->runNo, data->subRunNo, data->eventNo, data->tpcNo));
+}
+
+void GuiController::OnAnodeChanged(Int_t id)
+{
+    if (id == curAnode) return;
+    curAnode = id;
+    ReloadFile();
+}
+
+void GuiController::OnEventChanged(Int_t id)
+{
+    if (id < 0 || id >= (int)eventTags.size()) return;
+    if (id == curEvtIdx) return;
+    curEvtIdx = id;
+    ReloadFile();
+}
+
+void GuiController::PrevEvent()
+{
+    if (curEvtIdx <= 0) return;
+    --curEvtIdx;
+    ReloadFile();
+}
+
+void GuiController::NextEvent()
+{
+    if (curEvtIdx >= (int)eventTags.size() - 1) return;
+    ++curEvtIdx;
+    ReloadFile();
 }
 
 TString GuiController::OpenDialog()

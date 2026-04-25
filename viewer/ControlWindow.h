@@ -6,6 +6,7 @@
 class TGNumberEntry;
 class TGCheckButton;
 class TGTextButton;
+class TGComboBox;
 
 class ControlWindow: public TGVerticalFrame
 {
@@ -30,6 +31,12 @@ public:
     TGNumberEntry *threshScaleEntry;
     TGTextButton  *regionSumBtn;
     TGTextButton  *rmsBtn;
+
+    // Navigation row
+    TGComboBox    *anodeCombo;
+    TGComboBox    *eventCombo;
+    TGTextButton  *prevEvtButton;
+    TGTextButton  *nextEvtButton;
 
     ClassDef(ControlWindow, 0)
 };
